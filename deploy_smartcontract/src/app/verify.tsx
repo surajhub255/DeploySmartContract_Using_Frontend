@@ -1,24 +1,14 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { createPublicClient, http, Hex } from 'viem';
-import nero from './Nero.json';
-import { polygonAmoy} from 'viem/chains';
-import { useAccount, useChainId, useWalletClient } from 'wagmi';
+import { useAccount } from 'wagmi';
 import axios from 'axios';
 
-const publicClient = createPublicClient({
-  chain: polygonAmoy,
-  transport: http(),
-});
 
-const Deploy = () => {
+const Verify = () => {
   const { address: userAddress } = useAccount();
-  const chainId = useChainId();
-  const { data: walletClient } = useWalletClient({ chainId });
-
-  const [tokenAddress, setTokenAddress] = useState<`0x${string}` | undefined>();
+  // const tokenAddress = "0xe90e7968520fB085B693C699F09B2f1418EC4e49"
+  const tokenAddress = "0xfe7a9053326642380794d2d2f31a43c84e20fa6f"
   const [error, setError] = useState<string | null>(null);
-  const [isDeployed, setIsDeployed] = useState(false);
 
   useEffect(() => {
     if (userAddress) {
@@ -33,7 +23,8 @@ const Deploy = () => {
     compilerVersion: string,
     constructorArguments: string
   ) {
-    const apiKey = "RBNWT988E1EQS41KEP1P4GIHP279Y1TU7I";
+    // const apiKey = "RBNWT988E1EQS41KEP1P4GIHP279Y1TU7I";
+    const apiKey = "I4P2814JMQ4JEFNQQR6DCGIVUEW4DMVTIW";
 
     const params = new URLSearchParams();
     params.append('apikey', apiKey);
@@ -44,12 +35,13 @@ const Deploy = () => {
     params.append('codeformat', 'solidity-single-file');
     params.append('contractname', contractName);
     params.append('compilerversion', compilerVersion);
-    params.append('optimizationUsed', '0'); // Change to '1' if optimization was used
-    params.append('runs', '200'); // Change to the number of runs if optimization was used
+    params.append('optimizationUsed', '0');
+    params.append('runs', '200');
     params.append('constructorArguments', constructorArguments);
 
     try {
-      const response = await axios.post('https://api-sepolia.etherscan.io/api', params.toString());
+      // const response = await axios.post('https://api-sepolia.etherscan.io/api', params.toString());
+      const response = await axios.post('https://api-amoy.polygonscan.com/api', params.toString());
       console.log(apiKey);
       console.log(contractAddress);
       console.log(contractSourceCode);
@@ -67,47 +59,7 @@ const Deploy = () => {
     }
   }
 
-  async function deploy721A(
-    name: string,
-    symbol: string,
-    totalSupply: number,
-    tokenPrice: number,
-    bronzeLevel: number,
-    silverLevel: number,
-    goldLevel: number
-  ) {
-    if (!walletClient) {
-      throw new Error('Wallet client is not available');
-    }
 
-    const hash = await walletClient.deployContract({
-      abi: nero.abi,
-      bytecode: nero.bytecode as Hex,
-      account: userAddress,
-      args: [name, symbol, totalSupply, tokenPrice, '0xf5d0A178a61A2543c98FC4a73E3e78a097DBD9EE', bronzeLevel, silverLevel, goldLevel],
-    });
-
-    if (!hash) {
-      throw new Error('Failed to execute deploy contract transaction');
-    }
-
-    const txn = await publicClient.waitForTransactionReceipt({ hash });
-    setTokenAddress(txn.contractAddress as `0x${string}`);
-    setIsDeployed(true);
-
-    return txn.contractAddress;
-  }
-
-  const handleDeploy = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    event.preventDefault();
-    try {
-      const contractAddress = await deploy721A('suraj', 'SST', 1000, 0, 10, 100, 200);
-      console.log('Contract deployed at:', contractAddress);
-    } catch (error) {
-      setError('Error deploying contract: ' + error);
-      console.error('Error deploying contract:', error);
-    }
-  };
 
   const handleVerify = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     event.preventDefault();
@@ -294,8 +246,7 @@ contract Nero is ERC721A, Ownable, AccessControl {
     ) public view virtual override(ERC721A, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
-}
-`;
+}`;
     try {
       await verifyContract(
         tokenAddress as string,
@@ -312,27 +263,16 @@ contract Nero is ERC721A, Ownable, AccessControl {
 
   return (
     <main className="flex items-center justify-between p-24">
-      <form>
-        <label className="text-5xl text-white">Deploy Smart Contract</label> <br />
-        <button
-          className="p-2 px-6 bg-white text-black rounded-full mt-10 text-2xl"
-          onClick={handleDeploy}
-        >
-          Deploy
-        </button>
-      </form>
-      {isDeployed && (
-        <button
-          className="p-2 px-6 bg-white text-black rounded-full mt-10 text-2xl"
-          onClick={handleVerify}
-        >
-          Verify
-        </button>
-      )}
+      <button
+        className="p-2 px-6 bg-white text-black rounded-full mt-10 text-2xl"
+        onClick={handleVerify}
+      >
+        Verify
+      </button>
       {tokenAddress && <p className="text-white mt-4">Contract Address: {tokenAddress}</p>}
       {error && <p className="text-red-500 mt-4">{error}</p>}
     </main>
   );
 };
 
-export default Deploy;
+export default Verify;
