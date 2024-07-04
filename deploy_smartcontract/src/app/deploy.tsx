@@ -2,12 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { createPublicClient, http, Hex } from 'viem';
 import nero from './Nero.json';
-import { polygonAmoy} from 'viem/chains';
+import { baseSepolia, polygonAmoy, sepolia} from 'viem/chains';
 import { useAccount, useChainId, useWalletClient } from 'wagmi';
 import axios from 'axios';
 
 const publicClient = createPublicClient({
-  chain: polygonAmoy,
+  chain: baseSepolia,
   transport: http(),
 });
 
@@ -31,9 +31,10 @@ const Deploy = () => {
     contractSourceCode: string,
     contractName: string,
     compilerVersion: string,
-    constructorArguments: string
+    constructorArguments: string,
+    licenseType: string
   ) {
-    const apiKey = "RBNWT988E1EQS41KEP1P4GIHP279Y1TU7I";
+    const apiKey = "7CU2HZAY6VD1CIG7C5DD8N4TKWZ7JJ7SVT";
 
     const params = new URLSearchParams();
     params.append('apikey', apiKey);
@@ -47,9 +48,10 @@ const Deploy = () => {
     params.append('optimizationUsed', '0'); // Change to '1' if optimization was used
     params.append('runs', '200'); // Change to the number of runs if optimization was used
     params.append('constructorArguments', constructorArguments);
+    params.append('licenseType', licenseType);
 
     try {
-      const response = await axios.post('https://api-sepolia.etherscan.io/api', params.toString());
+      const response = await axios.post('https://api-sepolia.basescan.org/api', params.toString());
       console.log(apiKey);
       console.log(contractAddress);
       console.log(contractSourceCode);
@@ -69,12 +71,9 @@ const Deploy = () => {
 
   async function deploy721A(
     name: string,
-    symbol: string,
-    totalSupply: number,
-    tokenPrice: number,
-    bronzeLevel: number,
-    silverLevel: number,
-    goldLevel: number
+		symbol: string,
+		contractDetails: (string | number)[],
+		baseUri: string
   ) {
     if (!walletClient) {
       throw new Error('Wallet client is not available');
@@ -84,14 +83,17 @@ const Deploy = () => {
       abi: nero.abi,
       bytecode: nero.bytecode as Hex,
       account: userAddress,
-      args: [name, symbol, totalSupply, tokenPrice, '0xf5d0A178a61A2543c98FC4a73E3e78a097DBD9EE', bronzeLevel, silverLevel, goldLevel],
+      // args: [platformFee, memory_name, '0xe58b70db9baed3d1eac99e9ae4a8173bfa2e01d5']
+			args: [name, symbol, '0xba76e0b301d0b3a1a972a7a09aeb1165d8d04ee7', '0x9d4a23da70c84cde233f504b8c2047ed753cf582', '0xe6b8a5CF854791412c1f6EFC7CAf629f5Df1c747', contractDetails, baseUri]
+      // args: ['0xf5d0A178a61A2543c98FC4a73E3e78a097DBD9EE']
     });
 
     if (!hash) {
       throw new Error('Failed to execute deploy contract transaction');
     }
-
+    console.log("hash", hash)
     const txn = await publicClient.waitForTransactionReceipt({ hash });
+    console.log('transaction result is', txn, txn.to);
     setTokenAddress(txn.contractAddress as `0x${string}`);
     setIsDeployed(true);
 
@@ -101,7 +103,19 @@ const Deploy = () => {
   const handleDeploy = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     event.preventDefault();
     try {
-      const contractAddress = await deploy721A('suraj', 'SST', 1000, 0, 10, 100, 200);
+      const contractDetailsString = ["10000000000000000", 100, 300, 6];
+			const contractDetails = contractDetailsString.map((item, index) => {
+				if (index === 0) {
+					return item; // Keep the first element as a string
+				} else {
+					const num = Number(item);
+					return isNaN(num) ? item : num;
+				}
+			});
+
+			console.log(contractDetails);
+      const contractAddress = await deploy721A('Hanovery', "AC", contractDetails, "www.baseuri.com");
+      // const contractAddress = await deploy721A(30, 'NFT BAZAAR');
       console.log('Contract deployed at:', contractAddress);
     } catch (error) {
       setError('Error deploying contract: ' + error);
@@ -115,194 +129,251 @@ const Deploy = () => {
       setError('No contract address found to verify.');
       return;
     }
-    const contractSourceCode = `pragma solidity ^0.8.24;
+    const contractSourceCode = `// SPDX-License-Identifier: MIT
+    // Original license: SPDX_License_Identifier: MIT
 
-import "erc721a/contracts/ERC721A.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+    pragma solidity ^0.8.20;
 
-contract Nero is ERC721A, Ownable, AccessControl {
-    bytes32 public constant MINTER_ROLE = keccak256("NERO_SCOREBOARD_UPDATER");
-
-    mapping(uint256 => uint256) public scoreboard; // mapping between the NFT and the number of visits
-    bool public locked = false;
-    uint256 public maxSupply;
-    string public unlockedGlbURI; // unlocked avatar - token holder access only
-    string public unlockedBackgroundURI; // unlocked background - token holder access only
-
-    string public lockedGlbURI; // locked avatar - public access
-    string public lockedBackgroundURI; // locked backround - public access
-
-    string public tokenURILink; // single token URI
-
-    string public publicKnowledgeLink; // link to public knowledge configuration for agent
-
-    string public privateKnowledgeLink; // link to private knowledge configuration for token-gated content
-
-    string public metadataURI; // metadata 
-
-    uint256 public pricePerTokenMint;
-
-    uint256 public bronzeTierUnlock = 10; // 10 people visit, unlock dance move 1
-    uint256 public silverTierUnlock = 100; // 100 people visit, unlock dance move 2
-    uint256 public goldTierUnlock = 200; // 200 people visit, unlock dance move 3
-
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint256 supply,
-        uint256 price, // price to be paid for nft
-        address nero, // our public key so we can auto-update scoreboard
-        uint256 bronzeLevel,
-        uint256 silverLevel,
-        uint256 goldLevel
-    ) ERC721A(name, symbol) Ownable(msg.sender) {
-        maxSupply = supply;
-        _grantRole(MINTER_ROLE, nero);
-        pricePerTokenMint = price;
-
-        require(bronzeLevel > 0 && silverLevel > bronzeLevel && goldLevel > silverLevel, 'invalid level configuration');
-
-        bronzeTierUnlock = bronzeLevel;
-        silverTierUnlock = silverLevel;
-        goldTierUnlock = goldLevel;
+    interface IAccessControl {
+      error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
+      error AccessControlBadConfirmation();
+      event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);
+      event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+      event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+      function hasRole(bytes32 role, address account) external view returns (bool);
+      function getRoleAdmin(bytes32 role) external view returns (bytes32);
+      function grantRole(bytes32 role, address account) external;
+      function revokeRole(bytes32 role, address account) external;
+      function renounceRole(bytes32 role, address callerConfirmation) external;
     }
 
-    modifier unlocked() {
-        require(!locked, "nft already locked");
+    abstract contract Context {
+      function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+      }
 
+      function _msgData() internal view virtual returns (bytes calldata) {
+        return msg.data;
+      }
+
+      function _contextSuffixLength() internal view virtual returns (uint256) {
+        return 0;
+      }
+    }
+
+    interface IERC165 {
+      function supportsInterface(bytes4 interfaceId) external view returns (bool);
+    }
+
+    abstract contract ERC165 is IERC165 {
+      function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
+        return interfaceId == type(IERC165).interfaceId;
+      }
+    }
+
+    abstract contract AccessControl is Context, IAccessControl, ERC165 {
+      struct RoleData {
+        mapping(address => bool) members;
+        bytes32 adminRole;
+      }
+
+      mapping(bytes32 => RoleData) private _roles;
+
+      bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+
+      modifier onlyRole(bytes32 role) {
+        _checkRole(role);
         _;
-    }
+      }
 
-    function updateScoreboard(
-        uint256 nftId,
-        uint256 total
-    ) external onlyRole(MINTER_ROLE) {
-        require(
-            scoreboard[nftId] < total,
-            "cannot reduce the scoreboard must be bigger total"
-        );
-        require(_exists(nftId), "nft not exists");
-        scoreboard[nftId] = total;
-    }
+      function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IAccessControl).interfaceId || super.supportsInterface(interfaceId);
+      }
 
-    function mint(uint256 quantity) external payable {
-        require(
-            _totalMinted() < maxSupply && maxSupply > 0,
-            "no more tokens to mint"
-        );
-        require(
-            _totalMinted() + quantity <= maxSupply && maxSupply > 0,
-            "cannot mint more than max supply"
-        );
-        require(msg.value == pricePerTokenMint * quantity, "please pay required amount to mint");
-       
-        _mint(msg.sender, quantity);
-    }
+      function hasRole(bytes32 role, address account) public view virtual override returns (bool) {
+        return _roles[role].members[account];
+      }
 
-    /// lock the access to the NFT; once locked you can't unlock it
+      function _checkRole(bytes32 role) internal view virtual {
+        _checkRole(role, _msgSender());
+      }
 
-    function lock() public onlyOwner {
-        require(!locked, "already locked");
-        locked = true;
-    }
-
-    /// return the token URI of the locked GLB
-
-    function tokenURI(
-        uint256 tokenId
-    ) public view virtual override returns (string memory) {
-        if (!_exists(tokenId)) _revert(URIQueryForNonexistentToken.selector);
-
-        return
-            bytes(metadataURI).length != 0
-                ? string(abi.encodePacked(metadataURI))
-                : "";
-    }
-
-    /// Settings for user content against the NFT
-    /// locked content stores the 'uri' of the encrypted content
-    /// LIT is used to unlock this access based on NFT token holder
-
-    function updateUnlockedGlb(
-        string memory _unlockedGlbURI
-    ) public onlyOwner unlocked {
-        unlockedGlbURI = _unlockedGlbURI;
-    }
-
-    function updateUnlockedBackground(
-        string memory _unlockedBackgroundURI
-    ) public onlyOwner unlocked {
-        unlockedBackgroundURI = _unlockedBackgroundURI;
-    }
-
-    function updateLockedGlb(
-        string memory _lockedGlbURI
-    ) public onlyOwner unlocked {
-        lockedGlbURI = _lockedGlbURI;
-    }
-
-    function updateLockedBackground(
-        string memory _lockedBackgroundURI
-    ) public onlyOwner unlocked {
-        lockedBackgroundURI = _lockedBackgroundURI;
-    }
-
-    function updateMetadata(
-        string memory _unlockedGlbURI,
-        string memory _unlockedBackgroundURI,
-        string memory _lockedGlbURI,
-        string memory _lockedBackgroundURI,
-        string memory _publicKnowlegeURI,
-        string memory _privateKnowledgeURI,
-        string memory _metadataURI
-    ) public onlyOwner unlocked {
-        lockedBackgroundURI = _lockedBackgroundURI;
-        lockedGlbURI = _lockedGlbURI;
-        unlockedBackgroundURI = _unlockedBackgroundURI;
-        unlockedGlbURI = _unlockedGlbURI;
-        publicKnowledgeLink = _publicKnowlegeURI;
-        privateKnowledgeLink = _privateKnowledgeURI;
-        metadataURI = _metadataURI;
-        lock();
-    }
-
-    // Sneaker animations: 1-F_Dances_001, 2-005, 3-006, 4-007 & 
-    // Guitar Animations: 5-M_Dances_005, 6-008, 7-009 & 8-F_Dances_007
-    // if not these no dancing
-
-    function getDanceMove(uint256 tokenId) public view returns(uint256) {
-        require(_exists(tokenId), 'token does not exist');
-
-        if (scoreboard[tokenId] < bronzeTierUnlock) {
-            return 0; // normal
+      function _checkRole(bytes32 role, address account) internal view virtual {
+        if (!hasRole(role, account)) {
+          revert AccessControlUnauthorizedAccount(account, role);
         }
-        if (scoreboard[tokenId] < silverTierUnlock) {
-            return 1; // bronze tier
-        }
-        if (scoreboard[tokenId] < goldTierUnlock) {
-            return 2; // silver tier
-        }
+      }
 
-        return 3; // gold tier
+      function getRoleAdmin(bytes32 role) public view virtual override returns (bytes32) {
+        return _roles[role].adminRole;
+      }
+
+      function grantRole(bytes32 role, address account) public virtual override onlyRole(getRoleAdmin(role)) {
+        _grantRole(role, account);
+      }
+
+      function revokeRole(bytes32 role, address account) public virtual override onlyRole(getRoleAdmin(role)) {
+        _revokeRole(role, account);
+      }
+
+      function renounceRole(bytes32 role, address callerConfirmation) public virtual override {
+        if (callerConfirmation != _msgSender()) {
+          revert AccessControlBadConfirmation();
+        }
+        _revokeRole(role, callerConfirmation);
+      }
+
+      function _setRoleAdmin(bytes32 role, bytes32 adminRole) internal virtual {
+        bytes32 previousAdminRole = getRoleAdmin(role);
+        _roles[role].adminRole = adminRole;
+        emit RoleAdminChanged(role, previousAdminRole, adminRole);
+      }
+
+      function _grantRole(bytes32 role, address account) internal virtual {
+        if (!hasRole(role, account)) {
+          _roles[role].members[account] = true;
+          emit RoleGranted(role, account, _msgSender());
+        }
+      }
+
+      function _revokeRole(bytes32 role, address account) internal virtual {
+        if (hasRole(role, account)) {
+          _roles[role].members[account] = false;
+          emit RoleRevoked(role, account, _msgSender());
+        }
+      }
     }
 
-    /// Interface overrides
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override(ERC721A, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
+    interface IAccessControlEnumerable is IAccessControl {
+      function getRoleMember(bytes32 role, uint256 index) external view returns (address);
+      function getRoleMemberCount(bytes32 role) external view returns (uint256);
     }
-}
-`;
+
+    library EnumerableSet {
+      struct Set {
+        bytes32[] _values;
+        mapping(bytes32 => uint256) _indexes;
+      }
+
+      function _add(Set storage set, bytes32 value) private returns (bool) {
+        if (!_contains(set, value)) {
+          set._values.push(value);
+          set._indexes[value] = set._values.length;
+          return true;
+        } else {
+          return false;
+        }
+      }
+
+      function _remove(Set storage set, bytes32 value) private returns (bool) {
+        uint256 valueIndex = set._indexes[value];
+        if (valueIndex != 0) {
+          uint256 toDeleteIndex = valueIndex - 1;
+          uint256 lastIndex = set._values.length - 1;
+
+          if (lastIndex != toDeleteIndex) {
+            bytes32 lastValue = set._values[lastIndex];
+            set._values[toDeleteIndex] = lastValue;
+            set._indexes[lastValue] = valueIndex;
+          }
+
+          set._values.pop();
+          delete set._indexes[value];
+
+          return true;
+        } else {
+          return false;
+        }
+      }
+
+      function _contains(Set storage set, bytes32 value) private view returns (bool) {
+        return set._indexes[value] != 0;
+      }
+
+      function _length(Set storage set) private view returns (uint256) {
+        return set._values.length;
+      }
+
+      function _at(Set storage set, uint256 index) private view returns (bytes32) {
+        return set._values[index];
+      }
+
+      function _values(Set storage set) private view returns (bytes32[] memory) {
+        return set._values;
+      }
+
+      struct Bytes32Set {
+        Set _inner;
+      }
+
+      function add(Bytes32Set storage set, bytes32 value) internal returns (bool) {
+        return _add(set._inner, value);
+      }
+
+      function remove(Bytes32Set storage set, bytes32 value) internal returns (bool) {
+        return _remove(set._inner, value);
+      }
+
+      function contains(Bytes32Set storage set, bytes32 value) internal view returns (bool) {
+        return _contains(set._inner, value);
+      }
+
+      function length(Bytes32Set storage set) internal view returns (uint256) {
+        return _length(set._inner);
+      }
+
+      function at(Bytes32Set storage set, uint256 index) internal view returns (bytes32) {
+        return _at(set._inner, index);
+      }
+
+      function values(Bytes32Set storage set) internal view returns (bytes32[] memory) {
+        return _values(set._inner);
+      }
+
+      struct AddressSet {
+        Set _inner;
+      }
+
+      function add(AddressSet storage set, address value) internal returns (bool) {
+        return _add(set._inner, bytes32(uint256(uint160(value))));
+      }
+
+      function remove(AddressSet storage set, address value) internal returns (bool) {
+        return _remove(set._inner, bytes32(uint256(uint160(value))));
+      }
+
+      function contains(AddressSet storage set, address value) internal view returns (bool) {
+        return _contains(set._inner, bytes32(uint256(uint160(value))));
+      }
+
+      function length(AddressSet storage set) internal view returns (uint256) {
+        return _length(set._inner);
+      }
+
+      function at(AddressSet storage set, uint256 index) internal view returns (address) {
+        return address(uint160(uint256(_at(set._inner, index))));
+      }
+
+      function values(AddressSet storage set) internal view returns (address[] memory) {
+        bytes32[] memory store = _values(set._inner);
+        address[] memory result;
+
+        assembly {
+          result := store
+        }
+
+        return result;
+      }
+    }
+  `;
     try {
       await verifyContract(
         tokenAddress as string,
         contractSourceCode,
-        'Nero', // Contract name
-        'v0.8.0+commit.c7dfd78e', // Compiler version
-        ''
+        'AccessMaster', // Contract name
+        'v0.8.26+commit.8a97fa7a', 
+        '0xf5d0A178a61A2543c98FC4a73E3e78a097DBD9EE',
+        'MIT'
       );
     } catch (error) {
       setError('Error verifying contract: ' + error);
@@ -312,6 +383,7 @@ contract Nero is ERC721A, Ownable, AccessControl {
 
   return (
     <main className="flex items-center justify-between p-24">
+      <w3m-button />
       <form>
         <label className="text-5xl text-white">Deploy Smart Contract</label> <br />
         <button

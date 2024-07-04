@@ -1,22 +1,39 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next'
+import { Bai_Jamjuree as FontSans } from 'next/font/google'
+import './globals.css'
 
-const inter = Inter({ subsets: ["latin"] });
+import { headers } from 'next/headers'
 
+import { cookieToInitialState } from 'wagmi'
+import { config } from '@/lib/wagmi'
+import Providers from '@/lib/providers'
+import Web3ModalProvider from '@/lib/providers'
+
+
+
+const fontSans = FontSans({
+	subsets: ['latin'],
+	weight: ['400', '700'],
+	variable: '--font-sans',
+})
 export const metadata: Metadata = {
-  title: "Nero Minting",
-  description: "Nero Minting App!",
-};
+	title: 'Myriadflow Studio',
+	description: 'Create your brand phygital and NFTs',
+}
 
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode
 }>) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
-    </html>
-  );
+	const initialState = cookieToInitialState(config, headers().get('cookie'))
+	return (
+		<html lang='en' suppressHydrationWarning>
+			<Providers>
+				<body>
+				<Web3ModalProvider initialState={initialState}>{children}</Web3ModalProvider>
+				</body>
+			</Providers>
+		</html>
+	)
 }

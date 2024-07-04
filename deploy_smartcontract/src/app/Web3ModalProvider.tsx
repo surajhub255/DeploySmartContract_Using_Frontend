@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { State, WagmiProvider } from 'wagmi'
 import { defaultWagmiConfig } from '@web3modal/wagmi'
-import { mainnet, polygonAmoy, sepolia } from 'viem/chains'
+import { baseSepolia, mainnet, polygonAmoy, sepolia } from 'viem/chains'
 
 // Setup queryClient
 const queryClient = new QueryClient()
@@ -23,7 +23,7 @@ const metadata = {
   icons: ['https://avatars.githubusercontent.com/u/37784886'],
 };
 
-const chains = [mainnet, sepolia , polygonAmoy] as const;
+const chains = [mainnet, sepolia , polygonAmoy , baseSepolia] as const;
 
 export const config = defaultWagmiConfig({
   chains,
