@@ -20,9 +20,14 @@ const chains = [baseSepolia] as const
 export const config = defaultWagmiConfig({
   chains,
   projectId,
+  enableEmail: true ,
   metadata,
+  auth: {
+    socials: ["github", "google", "x", "discord", "apple"],
+    showWallets: true, // default to true
+  },
   ssr: true,
   storage: createStorage({
     storage: cookieStorage
-  }),
-})
+  })
+});
